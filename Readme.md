@@ -1,6 +1,4 @@
-# ConvE
-
-Implementation of ConvE proposed by Dettmers et al. in [Convolutional 2D Knowledge Graph Embeddings](https://arxiv.org/abs/1707.01476). You can find the official repository with knowledge graph datasets [here](https://github.com/TimDettmers/ConvE).
+# DSConvE
 
 Implementation uses [PyTorch](http://pytorch.org/).
 
@@ -45,7 +43,7 @@ usage: train.py [-h] [--name NAME] [--batch-size BATCH_SIZE] [--epochs EPOCHS]
                 [--label-smooth LABEL_SMOOTH]
                 train_path valid_path
 
-Train ConvE with PyTorch.
+Train DSConvE with PyTorch.
 
 positional arguments:
   train_path            Path to training .pkl produced by preprocess.py

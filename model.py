@@ -9,8 +9,19 @@ class Flatten(nn.Module):
         x = x.view(n, -1)
         return x
 
+class DSConv2d(nn.Module):
+    def __init__(self, nin, nout, kernel_size = 3, padding = 1, bias=False):
+        super(DSConv2d, self).__init__()
+        self.depthwise = nn.Conv2d(nin, nin, kernel_size=kernel_size, padding=padding, groups=nin, bias=bias)
+        self.pointwise = nn.Conv2d(nin, nout, kernel_size=1, bias=bias)
 
-class ConvE(nn.Module):
+    def forward(self, x):
+        out = self.depthwise(x)
+        out = self.pointwise(out)
+        return out
+
+
+class DSConvE(nn.Module):
     def __init__(self, num_e, num_r, embedding_size_h=20, embedding_size_w=10,
                  conv_channels=32, conv_kernel_size=3, embed_dropout=0.2, feature_map_dropout=0.2,
                  proj_layer_dropout=0.3):
@@ -30,7 +41,7 @@ class ConvE(nn.Module):
 
         self.conv_e = nn.Sequential(
             nn.Dropout(p=embed_dropout),
-            nn.Conv2d(in_channels=1, out_channels=conv_channels, kernel_size=conv_kernel_size),
+            DSConv2d(nin=1, nout=conv_channels, kernel_size=conv_kernel_size),
             nn.ReLU(),
             nn.BatchNorm2d(num_features=conv_channels),
             nn.Dropout2d(p=feature_map_dropout),

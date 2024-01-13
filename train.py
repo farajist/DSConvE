@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm, trange
 
 from dataset import KnowledgeGraphDataset, collate_train, collate_valid
-from model import ConvE
+from model import DSConvE
 from util import AttributeDict
 
 logger = logging.getLogger(__file__)
@@ -98,7 +98,7 @@ def valid(epoch, data, conv_e, batch_size, log_decs):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Train ConvE with PyTorch.')
+    parser = argparse.ArgumentParser(description='Train DSConvE with PyTorch.')
     parser.add_argument('train_path', action='store', type=str,
                         help='Path to training .pkl produced by preprocess.py')
     parser.add_argument('valid_path', action='store', type=str,
@@ -116,7 +116,7 @@ def parse_args():
 def setup_logger(args):
     log_file = args.log_file
     tensorboard_log_dir = 'tensorboard_' + args.name
-    shutil.rmtree(tensorboard_log_dir)
+    shutil.rmtree(tensorboard_log_dir, ignore_errors=True)
     if args.log_file is None:
         if args.name == '':
             log_file = 'train.log'
@@ -147,7 +147,7 @@ def main():
     valid_data.r_to_index = train_data.r_to_index
     valid_data.index_to_r = train_data.index_to_r
 
-    conv_e = ConvE(num_e=len(train_data.e_to_index), num_r=len(train_data.r_to_index)).cuda()
+    conv_e = DSConvE(num_e=len(train_data.e_to_index), num_r=len(train_data.r_to_index)).cuda()
     criterion = StableBCELoss()
     optimizer = optim.Adam(conv_e.parameters(), lr=0.003)
 
