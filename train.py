@@ -31,7 +31,7 @@ class StableBCELoss(nn.modules.Module):
         return loss.mean()
 
 
-def train(epoch, data, conv_e, criterion, optimizer, args):
+def train(epoch, data, ds_conv_e, criterion, optimizer, args):
     train_set = DataLoader(
         KnowledgeGraphDataset(data.x, data.y, e_to_index=data.e_to_index, r_to_index=data.r_to_index),
         collate_fn=collate_train, batch_size=args.batch_size, num_workers=4, shuffle=True)
@@ -39,7 +39,7 @@ def train(epoch, data, conv_e, criterion, optimizer, args):
     progress_bar = tqdm(iter(train_set))
     moving_loss = 0
 
-    conv_e.train(True)
+    ds_conv_e.train(True)
     y_multihot = torch.LongTensor(args.batch_size, len(data.e_to_index))
     for s, r, os in progress_bar:
         s, r = Variable(s).cuda(), Variable(r).cuda()
@@ -53,40 +53,40 @@ def train(epoch, data, conv_e, criterion, optimizer, args):
 
         targets = Variable(y_smooth, requires_grad=False).cuda()
 
-        output = conv_e(s, r)
+        output = ds_conv_e(s, r)
         loss = criterion(output, targets)
         loss.backward()
         optimizer.step()
-        conv_e.zero_grad()
+        ds_conv_e.zero_grad()
 
         if moving_loss == 0:
-            moving_loss = loss.data[0]
+            moving_loss = loss.data
         else:
-            moving_loss = moving_loss * 0.9 + loss.data[0] * 0.1
+            moving_loss = moving_loss * 0.9 + loss.data * 0.1
 
         progress_bar.set_description(
-            'Epoch: {}; Loss: {:.5f}; Avg: {:.5f}'.format(epoch + 1, loss.data[0], moving_loss))
+            'Epoch: {}; Loss: {:.5f}; Avg: {:.5f}'.format(epoch + 1, loss.data, moving_loss))
 
-    logger.info('Epoch: {}; Loss: {:.5f}; Avg: {:.5f}'.format(epoch + 1, loss.data[0], moving_loss))
+    logger.info('Epoch: {}; Loss: {:.5f}; Avg: {:.5f}'.format(epoch + 1, loss.data, moving_loss))
     tensorboard_logger.log_value('avg loss', moving_loss, epoch + 1)
-    tensorboard_logger.log_value('loss', loss.data[0], epoch + 1)
+    tensorboard_logger.log_value('loss', loss.data, epoch + 1)
 
 
-def valid(epoch, data, conv_e, batch_size, log_decs):
+def valid(epoch, data, ds_conv_e, batch_size, log_decs):
     dataset = KnowledgeGraphDataset(data.x, data.y, e_to_index=data.e_to_index, r_to_index=data.r_to_index)
     valid_set = DataLoader(dataset, collate_fn=collate_valid, batch_size=batch_size, num_workers=4, shuffle=True)
 
-    conv_e.train(False)
+    ds_conv_e.train(False)
     ranks = list()
     for s, r, os in tqdm(iter(valid_set)):
         s, r = Variable(s).cuda(), Variable(r).cuda()
-        output = conv_e.test(s, r)
+        output = ds_conv_e.test(s, r)
 
         for i in range(min(batch_size, s.size()[0])):
             _, top_indices = output[i].topk(output.size()[1])
             for o in os[i]:
                 _, rank = (top_indices == o).max(dim=0)
-                ranks.append(rank.data[0] + 1)
+                ranks.append(rank.data + 1)
 
     ranks_t = torch.FloatTensor(ranks)
     mr = ranks_t.mean()
@@ -147,17 +147,17 @@ def main():
     valid_data.r_to_index = train_data.r_to_index
     valid_data.index_to_r = train_data.index_to_r
 
-    conv_e = DSConvE(num_e=len(train_data.e_to_index), num_r=len(train_data.r_to_index)).cuda()
+    ds_conv_e = DSConvE(num_e=len(train_data.e_to_index), num_r=len(train_data.r_to_index)).cuda()
     criterion = StableBCELoss()
-    optimizer = optim.Adam(conv_e.parameters(), lr=0.003)
+    optimizer = optim.Adam(ds_conv_e.parameters(), lr=0.003)
 
     for epoch in trange(args.epochs):
-        train(epoch, train_data, conv_e, criterion, optimizer, args)
-        valid(epoch, train_data, conv_e, args.batch_size, 'train')
-        valid(epoch, valid_data, conv_e, args.batch_size, 'valid')
+        train(epoch, train_data, ds_conv_e, criterion, optimizer, args)
+        valid(epoch, train_data, ds_conv_e, args.batch_size, 'train')
+        valid(epoch, valid_data, ds_conv_e, args.batch_size, 'valid')
 
         with open('{}/checkpoint_{}.model'.format(checkpoint_path, str(epoch + 1).zfill(2)), 'wb') as f:
-            torch.save(conv_e, f)
+            torch.save(ds_conv_e, f)
 
 
 if __name__ == '__main__':
